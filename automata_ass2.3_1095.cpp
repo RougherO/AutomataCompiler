@@ -37,12 +37,12 @@ ostream& operator<<(ostream& os, nfa& machine)
     os << "table:\n";
     for (auto const& state : machine.states) {
         for (char alphabet : machine.alphabets) {
-            os << state << " " << alphabet << " [";
+            os << state << " " << alphabet << " {";
             auto const& cell = machine.table[state][alphabet];
             for (auto it = cell.begin(); it != cell.end(); ++it) {
                 os << *it << (next(it) != cell.end() ? ", " : "");
             }
-            os << "]\n";
+            os << "}\n";
         }
     }
 
@@ -152,8 +152,6 @@ set<string> epsilon_closure(string const& state, nfa const& machine)
 
 dfa nfa_to_dfa(nfa& m)
 {
-    m.alphabets.erase('_');
-
     map<string, int32_t> state_to_index;
     map<int32_t, string> index_to_state;
 
@@ -166,23 +164,13 @@ dfa nfa_to_dfa(nfa& m)
     }
 
     map<pair<char, int32_t>, int32_t> transition_map;
-    for (auto const& state : m.states) {
-        set<string> closure = epsilon_closure(state, m);
-        for (char c : m.alphabets) {
-            for (string const& s : closure) {
-                auto const& s_states = m.table.at(s).at(c);
-                m.table.at(state).at(c).insert(s_states.begin(), s_states.end());
-                if (m.final_states.find(s) != m.final_states.end()) {
-                    m.final_states.insert(state);
-                }
-            }
+    for (char c : m.alphabets) {
+        for (auto const& state : m.states) {
             for (auto const& s : m.table[state][c]) {
                 transition_map[{ c, state_to_index[state] }] |= state_to_index[s];
             }
         }
     }
-
-    cout << m << "\n";
 
     dfa machine;
     machine.alphabets = m.alphabets;
@@ -214,7 +202,65 @@ dfa nfa_to_dfa(nfa& m)
         }
     }
 
+    string dead_state = "q" + std::to_string(m.states.size());
+    for (char c : machine.alphabets) {
+        machine.table[dead_state][c] = dead_state;
+    }
+
+    bool need_dead {};
+    for (string state : machine.states) {
+        for (char c : machine.alphabets) {
+            if (machine.table[state][c].size() == 0) {
+                machine.table[state][c] = dead_state;
+                need_dead               = true;
+            }
+        }
+    }
+
+    if (need_dead) {
+        machine.states.insert(dead_state);
+    }
+
     return machine;
+}
+
+dfa e_nfa_to_dfa(nfa& m)
+{
+    map<string, int32_t> state_to_index;
+    map<int32_t, string> index_to_state;
+
+    int i {};
+
+    for (auto it = m.states.begin(); it != m.states.end(); ++it) {
+        state_to_index[*it]    = (1 << i);
+        index_to_state[1 << i] = *it;
+        ++i;
+    }
+
+    map<pair<char, int32_t>, int32_t> transition_map;
+    for (auto const& state : m.states) {
+        for (char c : m.alphabets) {
+            for (string const& t_state : m.table[state][c]) {
+                set<string> closure = epsilon_closure(t_state, m);
+                // for (string const& s : closure) {
+                // auto const& s_states = m.table.at(s).at(c);
+                m.table.at(state).at(c).insert(closure.begin(), closure.end());
+                // if (m.final_states.find(s) != m.final_states.end()) {
+                //     m.final_states.insert(state);
+                // }
+                // }
+                for (auto const& s : m.table[state][c]) {
+                    transition_map[{ c, state_to_index[state] }] |= state_to_index[s];
+                }
+            }
+        }
+    }
+
+    m.alphabets.erase('_');
+
+    cout << m << "\n";
+
+    return nfa_to_dfa(m);
 }
 
 [[nodiscard]] nfa create_machine()
@@ -275,7 +321,7 @@ int main()
 
     cout << epsilon_nfa_machine << "\n";
 
-    dfa dfa_machine = nfa_to_dfa(epsilon_nfa_machine);
+    dfa dfa_machine = e_nfa_to_dfa(epsilon_nfa_machine);
 
     cout << dfa_machine;
 }

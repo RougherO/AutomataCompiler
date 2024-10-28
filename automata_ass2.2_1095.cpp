@@ -107,6 +107,25 @@ dfa nfa_to_dfa(nfa& m)
         }
     }
 
+    string dead_state = "q" + std::to_string(m.states.size());
+    for (char c : machine.alphabets) {
+        machine.table[dead_state][c] = dead_state;
+    }
+
+    bool need_dead {};
+    for (string state : machine.states) {
+        for (char c : machine.alphabets) {
+            if (machine.table[state][c].size() == 0) {
+                machine.table[state][c] = dead_state;
+                need_dead               = true;
+            }
+        }
+    }
+
+    if (need_dead) {
+        machine.states.insert(dead_state);
+    }
+
     return machine;
 }
 
@@ -173,12 +192,12 @@ ostream& operator<<(ostream& os, nfa& machine)
     os << "table:\n";
     for (auto const& state : machine.states) {
         for (char alphabet : machine.alphabets) {
-            os << state << " " << alphabet << " [";
+            os << state << " " << alphabet << " {";
             auto const& cell = machine.table[state][alphabet];
             for (auto it = cell.begin(); it != cell.end(); ++it) {
                 os << *it << (next(it) != cell.end() ? ", " : "");
             }
-            os << "]\n";
+            os << "}\n";
         }
     }
 

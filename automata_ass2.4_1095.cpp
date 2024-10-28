@@ -262,6 +262,25 @@ int main()
 
     _DFA _minimized_dfa = create_machine(minimized_dfa, index_to_state);
 
+    string dead_state = "q" + std::to_string(_minimized_dfa.states.size());
+    for (char c : _minimized_dfa.alphabets) {
+        _minimized_dfa.table[dead_state][c] = dead_state;
+    }
+
+    bool need_dead {};
+    for (string state : _minimized_dfa.states) {
+        for (char c : _minimized_dfa.alphabets) {
+            if (_minimized_dfa.table[state][c].size() == 0) {
+                _minimized_dfa.table[state][c] = dead_state;
+                need_dead                      = true;
+            }
+        }
+    }
+
+    if (need_dead) {
+        _minimized_dfa.states.insert(dead_state);
+    }
+
     cout << "\nMinimized DFA:\n";
     cout << _minimized_dfa;
 }
